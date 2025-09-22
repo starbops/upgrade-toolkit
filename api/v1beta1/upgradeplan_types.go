@@ -68,6 +68,10 @@ type UpgradePlanSpec struct {
 	// +optional
 	Upgrade *string `json:"upgrade,omitempty"`
 
+	// force indicates the UpgradePlan will be forcibly applied, ignoring any pre-upgrade check failures. Default to "false".
+	// +optional
+	Force *bool `json:"force,omitempty"`
+
 	// mode represents the manipulative style of the UpgradePlan. Can be either of "automatic" or "interactive". Default to "automatic".
 	// +optional
 	Mode *string `json:"mode,omitempty"`

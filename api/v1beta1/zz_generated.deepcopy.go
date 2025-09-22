@@ -108,6 +108,11 @@ func (in *UpgradePlanSpec) DeepCopyInto(out *UpgradePlanSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.Force != nil {
+		in, out := &in.Force, &out.Force
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Mode != nil {
 		in, out := &in.Mode, &out.Mode
 		*out = new(string)

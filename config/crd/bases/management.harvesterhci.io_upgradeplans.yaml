@@ -39,6 +39,10 @@ spec:
           spec:
             description: spec defines the desired state of UpgradePlan
             properties:
+              force:
+                description: force indicates the UpgradePlan will be forcibly applied,
+                  ignoring any pre-upgrade check failures. Default to "false".
+                type: boolean
               mode:
                 description: mode represents the manipulative style of the UpgradePlan.
                   Can be either of "automatic" or "interactive". Default to "automatic".
