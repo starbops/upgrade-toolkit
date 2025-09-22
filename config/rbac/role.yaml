@@ -1,0 +1,35 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - management.harvesterhci.io
+  resources:
+  - upgradeplans
+  - versions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - management.harvesterhci.io
+  resources:
+  - upgradeplans/finalizers
+  - versions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - management.harvesterhci.io
+  resources:
+  - upgradeplans/status
+  - versions/status
+  verbs:
+  - get
+  - patch
+  - update
