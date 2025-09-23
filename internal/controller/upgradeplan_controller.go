@@ -45,16 +45,17 @@ import (
 const (
 	harvesterSystemNamespace = "harvester-system"
 	cattleSystemNamespace    = "cattle-system"
+	harvesterName            = "harvester"
+	sucName                  = "system-upgrade-controller"
 
+	harvesterManagedLabel          = "harvesterhci.io/managed"
 	harvesterUpgradePlanLabel      = "management.harvesterhci.io/upgrade-plan"
 	harvesterUpgradeComponentLabel = "management.harvesterhci.io/upgrade-component"
-	clusterComponent               = "cluster-component"
-	nodeComponent                  = "node-component"
+	prepareComponent               = "image-preload"
+	clusterComponent               = "cluster-upgrade"
+	nodeComponent                  = "node-upgrade"
 
-	defaultRequeueInterval             = 1 * time.Minute
-	defaultStatusUpdateRequeueInterval = 5 * time.Second
-	defaultDownloadRequeueInterval     = 3 * time.Second
-	defaultTTLSecondsAfterFinished     = 604800 // 7 days
+	defaultTTLSecondsAfterFinished = 604800 // 7 days
 
 	rke2UpgradeImage    = "rancher/rke2-upgrade"
 	upgradeToolkitImage = "rancher/harvester-upgrade"
@@ -162,7 +163,7 @@ func (r *UpgradePlanReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			if apierrors.IsConflict(statusUpdateErr) {
 				return ctrl.Result{Requeue: true}, nil
 			}
-			return ctrl.Result{RequeueAfter: defaultStatusUpdateRequeueInterval}, statusUpdateErr
+			return ctrl.Result{}, statusUpdateErr
 		}
 	}
 
@@ -242,7 +243,7 @@ func (r *UpgradePlanReconciler) handleMetadataPopulate(ctx context.Context, upgr
 	harvesterRelease := newHarvesterRelease(upgradePlan)
 	if err := harvesterRelease.loadReleaseMetadata(); err != nil {
 		upgradePlan.Status.Phase = managementv1beta1.UpgradePlanPhaseMetadataPopulating
-		return ctrl.Result{RequeueAfter: defaultDownloadRequeueInterval}, err
+		return ctrl.Result{}, err
 	}
 	upgradePlan.Status.ReleaseMetadata = harvesterRelease.ReleaseMetadata
 
@@ -253,12 +254,23 @@ func (r *UpgradePlanReconciler) handleMetadataPopulate(ctx context.Context, upgr
 func (r *UpgradePlanReconciler) handleImagePreload(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(0).Info("handle image preload")
 
-	// Dummy image preload
-	if upgradePlan.Status.Phase == managementv1beta1.UpgradePlanPhaseImagePreloading {
-		upgradePlan.Status.Phase = managementv1beta1.UpgradePlanPhaseImagePreloaded
+	imagePreloadPlan, err := r.getOrCreatePlanForImagePreload(ctx, upgradePlan)
+	if err != nil {
+		r.Log.Error(err, "unable to retrieve image-preload plan from upgradeplan")
+		return ctrl.Result{}, err
+	}
+
+	finished := isPlanFinished(imagePreloadPlan)
+
+	// Plan still running
+	if !finished {
+		r.Log.V(1).Info("image-preload plan running")
+		upgradePlan.Status.Phase = managementv1beta1.UpgradePlanPhaseImagePreloading
 		return ctrl.Result{}, nil
 	}
-	upgradePlan.Status.Phase = managementv1beta1.UpgradePlanPhaseImagePreloading
+
+	// Plan finished successfully
+	upgradePlan.Status.Phase = managementv1beta1.UpgradePlanPhaseImagePreloaded
 	return ctrl.Result{}, nil
 }
 
@@ -267,7 +279,7 @@ func (r *UpgradePlanReconciler) handleClusterUpgrade(ctx context.Context, upgrad
 
 	clusterUpgradeJob, err := r.getOrCreateJobForClusterUpgrade(ctx, upgradePlan)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 
 	finished, success := isJobFinished(clusterUpgradeJob)
@@ -297,14 +309,14 @@ func (r *UpgradePlanReconciler) handleNodeUpgrade(ctx context.Context, upgradePl
 	nodeUpgradePlan, err := r.getOrCreatePlanForNodeUpgrade(ctx, upgradePlan)
 	if err != nil {
 		r.Log.Error(err, "unable to retrieve node-upgrade plan from upgradeplan")
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 
 	finished := isPlanFinished(nodeUpgradePlan)
 
 	// Plan still running
 	if !finished {
-		r.Log.V(1).Info("node-upgrade job running")
+		r.Log.V(1).Info("node-upgrade plan running")
 		upgradePlan.Status.Phase = managementv1beta1.UpgradePlanPhaseNodeUpgrading
 		return ctrl.Result{}, nil
 	}
@@ -333,6 +345,23 @@ func (r *UpgradePlanReconciler) handleFinalize(ctx context.Context, upgradePlan 
 
 	upgradePlan.Status.Phase = managementv1beta1.UpgradePlanPhaseSucceeded
 	return ctrl.Result{}, nil
+}
+
+func (r *UpgradePlanReconciler) createPlanForImagePreload(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*upgradev1.Plan, error) {
+	newPlan := constructPlanForImagePreload(upgradePlan)
+	if err := controllerutil.SetControllerReference(upgradePlan, newPlan, r.Scheme); err != nil {
+		return nil, err
+	}
+	if err := r.Create(ctx, newPlan, &client.CreateOptions{}); err != nil {
+		return nil, err
+	}
+
+	var plan upgradev1.Plan
+	if err := r.Get(ctx, types.NamespacedName{Namespace: newPlan.Namespace, Name: newPlan.Name}, &plan); err != nil {
+		return nil, err
+	}
+
+	return &plan, nil
 }
 
 func (r *UpgradePlanReconciler) createJobForClusterUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*batchv1.Job, error) {
@@ -369,8 +398,20 @@ func (r *UpgradePlanReconciler) createPlanForNodeUpgrade(ctx context.Context, up
 	return &plan, nil
 }
 
+func (r *UpgradePlanReconciler) getOrCreatePlanForImagePreload(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*upgradev1.Plan, error) {
+	planName := fmt.Sprintf("%s-%s", upgradePlan.Name, prepareComponent)
+	var plan upgradev1.Plan
+	if err := r.Get(ctx, types.NamespacedName{Namespace: cattleSystemNamespace, Name: planName}, &plan); err != nil {
+		if apierrors.IsNotFound(err) {
+			return r.createPlanForImagePreload(ctx, upgradePlan)
+		}
+		return nil, err
+	}
+	return &plan, nil
+}
+
 func (r *UpgradePlanReconciler) getOrCreateJobForClusterUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*batchv1.Job, error) {
-	jobName := fmt.Sprintf("%s-cluster-upgrade", upgradePlan.Name)
+	jobName := fmt.Sprintf("%s-%s", upgradePlan.Name, clusterComponent)
 	var job batchv1.Job
 	if err := r.Get(ctx, types.NamespacedName{Namespace: harvesterSystemNamespace, Name: jobName}, &job); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -382,7 +423,7 @@ func (r *UpgradePlanReconciler) getOrCreateJobForClusterUpgrade(ctx context.Cont
 }
 
 func (r *UpgradePlanReconciler) getOrCreatePlanForNodeUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*upgradev1.Plan, error) {
-	planName := fmt.Sprintf("%s-node-upgrade", upgradePlan.Name)
+	planName := fmt.Sprintf("%s-%s", upgradePlan.Name, nodeComponent)
 	var plan upgradev1.Plan
 	if err := r.Get(ctx, types.NamespacedName{Namespace: cattleSystemNamespace, Name: planName}, &plan); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -504,7 +545,7 @@ func constructJobForClusterUpgrade(upgradePlan *managementv1beta1.UpgradePlan) *
 							},
 						},
 					},
-					ServiceAccountName: "harvester",
+					ServiceAccountName: harvesterName,
 					Tolerations:        getDefaultTolerations(),
 				},
 			},
@@ -524,51 +565,83 @@ func getKubernetesVersion(upgradePlan *managementv1beta1.UpgradePlan) string {
 	return ""
 }
 
-func constructPlanForNodeUpgrade(upgradePlan *managementv1beta1.UpgradePlan) *upgradev1.Plan {
-	planName := fmt.Sprintf("%s-node-upgrade", upgradePlan.Name)
-	kubernetesVersion := getKubernetesVersion(upgradePlan)
+func constructPlan(upgradePlanName, componentName string, concurrency int, nodeSelector *metav1.LabelSelector, maintenance bool, container *upgradev1.ContainerSpec, version string) *upgradev1.Plan {
+	planName := fmt.Sprintf("%s-%s", upgradePlanName, componentName)
+
 	plan := &upgradev1.Plan{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				harvesterUpgradePlanLabel:      upgradePlan.Name,
-				harvesterUpgradeComponentLabel: nodeComponent,
+				harvesterUpgradePlanLabel:      upgradePlanName,
+				harvesterUpgradeComponentLabel: componentName,
 			},
 			Name:      planName,
 			Namespace: cattleSystemNamespace,
 		},
 		Spec: upgradev1.PlanSpec{
-			Concurrency: 1,
-			NodeSelector: &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "node-role.kubernetes.io/control-plane",
-						Operator: metav1.LabelSelectorOpIn,
-						Values: []string{
-							"true",
-						},
-					},
-				},
-			},
-			Tolerations: []corev1.Toleration{
-				{
-					Key:      "CriticalAddonsOnly",
-					Operator: corev1.TolerationOpEqual,
-					Value:    "true",
-					Effect:   corev1.TaintEffectNoExecute,
-				},
-			},
-			ServiceAccountName: "system-upgrade-controller",
-			Cordon:             true,
-			Drain: &upgradev1.DrainSpec{
-				Force: true,
-			},
-			Upgrade: &upgradev1.ContainerSpec{
-				Image: rke2UpgradeImage,
-			},
-			Version: kubernetesVersion,
+			Concurrency:           int64(concurrency),
+			JobActiveDeadlineSecs: ptr.To[int64](0),
+			NodeSelector:          nodeSelector,
+			ServiceAccountName:    sucName,
+			Tolerations:           getDefaultTolerations(),
+			Upgrade:               container,
+			Version:               version,
 		},
 	}
+
+	if maintenance {
+		plan.Spec.Cordon = true
+		plan.Spec.Drain = &upgradev1.DrainSpec{
+			Force: true,
+		}
+	}
+
 	return plan
+}
+
+func constructPlanForImagePreload(upgradePlan *managementv1beta1.UpgradePlan) *upgradev1.Plan {
+	selector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			harvesterManagedLabel: "true",
+		},
+	}
+	container := &upgradev1.ContainerSpec{
+		Image: upgradeToolkitImage,
+		// Command: []string{"do_upgrade_node.sh"},
+		// Args:    []string{"prepare"},
+		// Env: []corev1.EnvVar{
+		// 	{
+		// 		Name:  "HARVESTER_UPGRADEPLAN_NAME",
+		// 		Value: upgradePlan.Name,
+		// 	},
+		// },
+		Command: []string{
+			"sleep",
+			"30",
+		},
+	}
+	version := getUpgradeVersion(upgradePlan)
+
+	return constructPlan(upgradePlan.Name, prepareComponent, 1, selector, false, container, version)
+}
+
+func constructPlanForNodeUpgrade(upgradePlan *managementv1beta1.UpgradePlan) *upgradev1.Plan {
+	selector := &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "node-role.kubernetes.io/control-plane",
+				Operator: metav1.LabelSelectorOpIn,
+				Values: []string{
+					"true",
+				},
+			},
+		},
+	}
+	container := &upgradev1.ContainerSpec{
+		Image: rke2UpgradeImage,
+	}
+	version := getKubernetesVersion(upgradePlan)
+
+	return constructPlan(upgradePlan.Name, nodeComponent, 1, selector, true, container, version)
 }
 
 func isJobFinished(job *batchv1.Job) (finished, success bool) {
