@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +32,7 @@ import (
 type VersionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Log    logr.Logger
 }
 
 // +kubebuilder:rbac:groups=management.harvesterhci.io,resources=versions,verbs=get;list;watch;create;update;patch;delete

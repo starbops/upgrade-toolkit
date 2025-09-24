@@ -32,6 +32,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	batchv1 "k8s.io/api/batch/v1"
+
 	managementv1beta1 "github.com/harvester/upgrade-toolkit/api/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
@@ -60,6 +62,9 @@ var _ = BeforeSuite(func() {
 
 	var err error
 	err = managementv1beta1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = batchv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

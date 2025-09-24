@@ -194,8 +194,17 @@ func main() {
 	if err := (&controller.VersionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Log:    logf.FromContext(ctx).WithName("version-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Version")
+		os.Exit(1)
+	}
+	if err := (&controller.JobReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Log:    logf.FromContext(ctx).WithName("job-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Job")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

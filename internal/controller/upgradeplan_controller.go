@@ -204,7 +204,7 @@ func (r *UpgradePlanReconciler) reconcilePhase(ctx context.Context, upgradePlan 
 }
 
 func (r *UpgradePlanReconciler) initialize(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle initialize status")
+	r.Log.V(1).Info("handle initialize status")
 
 	upgradePlan.SetCondition(managementv1beta1.UpgradePlanAvailable, metav1.ConditionTrue, "Initialized", "")
 	upgradePlan.SetCondition(managementv1beta1.UpgradePlanProgressing, metav1.ConditionTrue, string(managementv1beta1.UpgradePlanPhaseInit), "")
@@ -213,7 +213,7 @@ func (r *UpgradePlanReconciler) initialize(ctx context.Context, upgradePlan *man
 }
 
 func (r *UpgradePlanReconciler) handleISODownload(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle iso download")
+	r.Log.V(1).Info("handle iso download")
 
 	// Dummy iso download
 	if upgradePlan.Status.Phase == managementv1beta1.UpgradePlanPhaseISODownloading {
@@ -225,7 +225,7 @@ func (r *UpgradePlanReconciler) handleISODownload(ctx context.Context, upgradePl
 }
 
 func (r *UpgradePlanReconciler) handleRepoCreate(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle repo create")
+	r.Log.V(1).Info("handle repo create")
 
 	// Dummy repo create
 	if upgradePlan.Status.Phase == managementv1beta1.UpgradePlanPhaseRepoCreating {
@@ -238,7 +238,7 @@ func (r *UpgradePlanReconciler) handleRepoCreate(ctx context.Context, upgradePla
 
 // handleMetadataPopulate populates UpgradePlan with release metadata retrieved from the Upgrade Repo
 func (r *UpgradePlanReconciler) handleMetadataPopulate(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle metadata populate")
+	r.Log.V(1).Info("handle metadata populate")
 
 	harvesterRelease := newHarvesterRelease(upgradePlan)
 	if err := harvesterRelease.loadReleaseMetadata(); err != nil {
@@ -252,7 +252,7 @@ func (r *UpgradePlanReconciler) handleMetadataPopulate(ctx context.Context, upgr
 }
 
 func (r *UpgradePlanReconciler) handleImagePreload(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle image preload")
+	r.Log.V(1).Info("handle image preload")
 
 	imagePreloadPlan, err := r.getOrCreatePlanForImagePreload(ctx, upgradePlan)
 	if err != nil {
@@ -275,7 +275,7 @@ func (r *UpgradePlanReconciler) handleImagePreload(ctx context.Context, upgradeP
 }
 
 func (r *UpgradePlanReconciler) handleClusterUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle cluster upgrade")
+	r.Log.V(1).Info("handle cluster upgrade")
 
 	clusterUpgradeJob, err := r.getOrCreateJobForClusterUpgrade(ctx, upgradePlan)
 	if err != nil {
@@ -304,7 +304,7 @@ func (r *UpgradePlanReconciler) handleClusterUpgrade(ctx context.Context, upgrad
 }
 
 func (r *UpgradePlanReconciler) handleNodeUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle node upgrade")
+	r.Log.V(1).Info("handle node upgrade")
 
 	nodeUpgradePlan, err := r.getOrCreatePlanForNodeUpgrade(ctx, upgradePlan)
 	if err != nil {
@@ -327,7 +327,7 @@ func (r *UpgradePlanReconciler) handleNodeUpgrade(ctx context.Context, upgradePl
 }
 
 func (r *UpgradePlanReconciler) handleResourceCleanup(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle resource cleanup")
+	r.Log.V(1).Info("handle resource cleanup")
 
 	// Dummy resource cleanup
 	if upgradePlan.Status.Phase == managementv1beta1.UpgradePlanPhaseCleaningUp {
@@ -339,7 +339,7 @@ func (r *UpgradePlanReconciler) handleResourceCleanup(ctx context.Context, upgra
 }
 
 func (r *UpgradePlanReconciler) finalize(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
-	r.Log.V(0).Info("handle finalize")
+	r.Log.V(1).Info("handle finalize")
 
 	markUpgradePlanComplete(upgradePlan)
 

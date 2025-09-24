@@ -13,10 +13,27 @@ spec:
     plural: upgradeplans
     shortNames:
     - up
+    - ups
     singular: upgradeplan
   scope: Cluster
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.version
+      name: VERSION
+      type: string
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Available')].status
+      name: AVAILABLE
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Progressing')].status
+      name: PROGRESSING
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Degraded')].status
+      name: DEGRADED
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: UpgradePlan is the Schema for the upgradeplans API
@@ -55,8 +72,8 @@ spec:
                   For instance, specifying "dev" for the field can go for the "rancher/harvester-upgrade:dev" image.
                 type: string
               version:
-                description: ' version refers to the corresponding version resource
-                  in the same namespace.'
+                description: version refers to the corresponding version resource
+                  in the same namespace.
                 type: string
             required:
             - version
@@ -133,14 +150,27 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              nodeUpgradeStatuses:
+                additionalProperties:
+                  properties:
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    state:
+                      type: string
+                  type: object
+                description: nodeStatuses reflect each node's upgrade status for node
+                  specific tasks
+                type: object
+                x-kubernetes-map-type: atomic
               phase:
                 description: phase shows what overall phase the UpgradePlan resource
                   is in.
                 type: string
               phaseTransitionTimestamps:
-                description: |-
-                  phaseTransitionTimestamp is the timestamp of when the last phase change occurred.
-                  listType=atomic
+                description: phaseTransitionTimestamp is the timestamp of when the
+                  last phase change occurred.
                 items:
                   properties:
                     phase:
@@ -155,10 +185,10 @@ spec:
                   - phaseTransitionTimestamp
                   type: object
                 type: array
+                x-kubernetes-list-type: atomic
               releaseMetadata:
-                description: |-
-                  releaseMetadata reflects the essential metadata extracted from the artifact.
-                  listType=atomic
+                description: releaseMetadata reflects the essential metadata extracted
+                  from the artifact.
                 properties:
                   harvester:
                     type: string

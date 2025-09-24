@@ -41,6 +41,20 @@ metadata:
   namespace: cattle-system
 rules:
 - apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs/status
+  verbs:
+  - get
+- apiGroups:
   - upgrade.cattle.io
   resources:
   - plans

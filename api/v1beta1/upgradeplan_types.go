@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/goccy/go-yaml"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,8 +32,14 @@ const (
 	UpgradePlanDegraded string = "Degraded"
 )
 
-// UpgradePlanPhase defines what overall phase UpgradePlan is in
-type UpgradePlanPhase string
+const (
+	NodeStateImagePreloading     string = "ImagePreloading"
+	NodeStateImagePreloaded      string = "ImagePreloaded"
+	NodeStateKubernetesUpgrading string = "KubernetesUpgrading"
+	NodeStateKubernetesUpgraded  string = "KubernetesUpgraded"
+	NodeStateOSUpgrading         string = "OSUpgrading"
+	NodeStateOSUpgraded          string = "OSUpgraded"
+)
 
 const (
 	UpgradePlanPhaseInit               UpgradePlanPhase = "Init"
@@ -56,6 +61,15 @@ const (
 	UpgradePlanPhaseFailed             UpgradePlanPhase = "Failed"
 )
 
+type NodeUpgradeStatus struct {
+	State   string `json:"state,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+// UpgradePlanPhase defines what overall phase UpgradePlan is in
+type UpgradePlanPhase string
+
 type UpgradePlanPhaseTransitionTimestamp struct {
 	Phase                    UpgradePlanPhase `json:"phase"`
 	PhaseTransitionTimestamp metav1.Time      `json:"phaseTransitionTimestamp"`
@@ -71,18 +85,6 @@ type ReleaseMetadata struct {
 	MinUpgradableVersion string `json:"minUpgradableVersion,omitempty"`
 }
 
-func (m *ReleaseMetadata) Marshall() (string, error) {
-	out, err := yaml.Marshal(m)
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
-}
-
-func (m *ReleaseMetadata) Unmarshall(data string) error {
-	return yaml.Unmarshal([]byte(data), m)
-}
-
 // UpgradePlanSpec defines the desired state of UpgradePlan
 type UpgradePlanSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -90,7 +92,8 @@ type UpgradePlanSpec struct {
 	// The following markers will use OpenAPI v3 schema to validate the value
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
-	//  version refers to the corresponding version resource in the same namespace.
+	// version refers to the corresponding version resource in the same namespace.
+	// +required
 	Version string `json:"version"`
 
 	// upgrade can be specified to opt for any other specific upgrade image. If not provided, the version resource name is used.
@@ -129,23 +132,32 @@ type UpgradePlanStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
+	// nodeStatuses reflect each node's upgrade status for node specific tasks
+	// +mapType=atomic
+	// +optional
+	NodeUpgradeStatuses map[string]NodeUpgradeStatus `json:"nodeUpgradeStatuses,omitempty"`
+
 	// phase shows what overall phase the UpgradePlan resource is in.
 	Phase UpgradePlanPhase `json:"phase,omitempty"`
 
 	// phaseTransitionTimestamp is the timestamp of when the last phase change occurred.
-	// listType=atomic
+	// +listType=atomic
 	// +optional
 	PhaseTransitionTimestamps []UpgradePlanPhaseTransitionTimestamp `json:"phaseTransitionTimestamps,omitempty"`
 
 	// releaseMetadata reflects the essential metadata extracted from the artifact.
-	// listType=atomic
 	// +optional
 	ReleaseMetadata *ReleaseMetadata `json:"releaseMetadata,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=up
+// +kubebuilder:resource:scope=Cluster,shortName=up;ups
+// +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=`.spec.version`
+// +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="AVAILABLE",type=string,JSONPath=`.status.conditions[?(@.type=='Available')].status`
+// +kubebuilder:printcolumn:name="PROGRESSING",type=string,JSONPath=`.status.conditions[?(@.type=='Progressing')].status`
+// +kubebuilder:printcolumn:name="DEGRADED",type=string,JSONPath=`.status.conditions[?(@.type=='Degraded')].status`
 
 // UpgradePlan is the Schema for the upgradeplans API
 type UpgradePlan struct {

@@ -71,66 +71,73 @@ A successfully executed UpgradePlan looks like the following:
 apiVersion: management.harvesterhci.io/v1beta1
 kind: UpgradePlan
 metadata:
-  creationTimestamp: "2025-09-23T13:41:31Z"
+  creationTimestamp: "2025-09-24T07:40:30Z"
   generateName: hvst-upgrade-
   generation: 1
-  name: hvst-upgrade-jq9n5
-  resourceVersion: "1656954"
-  uid: 1b0200e0-ecd4-4768-8c7c-f19814fbcefa
+  name: hvst-upgrade-tvncr
+  resourceVersion: "2887729"
+  uid: 73821e35-8512-46b7-8288-21c02ed445b1
 spec:
   version: v1.6.0
 status:
   conditions:
-  - lastTransitionTime: "2025-09-23T13:44:44Z"
+  - lastTransitionTime: "2025-09-24T07:45:19Z"
     message: ""
     observedGeneration: 1
     reason: Executed
     status: "False"
     type: Available
-  - lastTransitionTime: "2025-09-23T13:44:44Z"
+  - lastTransitionTime: "2025-09-24T07:45:19Z"
     message: UpgradePlan has completed
     observedGeneration: 1
     reason: CleanedUp
     status: "False"
     type: Progressing
-  - lastTransitionTime: "2025-09-23T13:44:44Z"
+  - lastTransitionTime: "2025-09-24T07:45:19Z"
     message: ""
     observedGeneration: 1
     reason: ReconcileSuccess
     status: "False"
     type: Degraded
+  nodeUpgradeStatuses:
+    charlie-1-tink-system:
+      state: KubernetesUpgraded
+    charlie-2-tink-system:
+      state: KubernetesUpgraded
+    charlie-3-tink-system:
+      state: KubernetesUpgraded
   phase: Succeeded
   phaseTransitionTimestamps:
   - phase: Init
-    phaseTransitionTimestamp: "2025-09-23T13:41:31Z"
+    phaseTransitionTimestamp: "2025-09-24T07:40:30Z"
   - phase: ISODownloading
-    phaseTransitionTimestamp: "2025-09-23T13:41:31Z"
+    phaseTransitionTimestamp: "2025-09-24T07:40:30Z"
   - phase: ISODownloaded
-    phaseTransitionTimestamp: "2025-09-23T13:41:31Z"
+    phaseTransitionTimestamp: "2025-09-24T07:40:31Z"
   - phase: RepoCreating
-    phaseTransitionTimestamp: "2025-09-23T13:41:31Z"
+    phaseTransitionTimestamp: "2025-09-24T07:40:31Z"
   - phase: RepoCreated
-    phaseTransitionTimestamp: "2025-09-23T13:41:31Z"
+    phaseTransitionTimestamp: "2025-09-24T07:40:31Z"
   - phase: MetadataPopulated
-    phaseTransitionTimestamp: "2025-09-23T13:41:32Z"
+    phaseTransitionTimestamp: "2025-09-24T07:40:31Z"
   - phase: ImagePreloading
-    phaseTransitionTimestamp: "2025-09-23T13:41:32Z"
+    phaseTransitionTimestamp: "2025-09-24T07:40:31Z"
   - phase: ImagePreloaded
-    phaseTransitionTimestamp: "2025-09-23T13:41:32Z"
+    phaseTransitionTimestamp: "2025-09-24T07:42:13Z"
   - phase: ClusterUpgrading
-    phaseTransitionTimestamp: "2025-09-23T13:41:33Z"
+    phaseTransitionTimestamp: "2025-09-24T07:42:14Z"
   - phase: ClusterUpgraded
-    phaseTransitionTimestamp: "2025-09-23T13:42:06Z"
+    phaseTransitionTimestamp: "2025-09-24T07:42:48Z"
   - phase: NodeUpgrading
-    phaseTransitionTimestamp: "2025-09-23T13:42:06Z"
+    phaseTransitionTimestamp: "2025-09-24T07:42:48Z"
   - phase: NodeUpgraded
-    phaseTransitionTimestamp: "2025-09-23T13:44:43Z"
+    phaseTransitionTimestamp: "2025-09-24T07:45:18Z"
   - phase: CleaningUp
-    phaseTransitionTimestamp: "2025-09-23T13:44:43Z"
+    phaseTransitionTimestamp: "2025-09-24T07:45:19Z"
   - phase: CleanedUp
-    phaseTransitionTimestamp: "2025-09-23T13:44:43Z"
+    phaseTransitionTimestamp: "2025-09-24T07:45:19Z"
   - phase: Succeeded
-    phaseTransitionTimestamp: "2025-09-23T13:44:44Z"
+    phaseTransitionTimestamp: "2025-09-24T07:45:19Z"
   releaseMetadata:
     harvester: v1.6.0
     harvesterChart: 1.6.0
