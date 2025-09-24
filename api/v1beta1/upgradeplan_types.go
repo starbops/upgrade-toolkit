@@ -200,7 +200,7 @@ func (u *UpgradePlan) SetCondition(conditionType string, conditionStatus metav1.
 			u.Status.Conditions[i].Reason = reason
 			u.Status.Conditions[i].Message = message
 			u.Status.Conditions[i].LastTransitionTime = metav1.Now()
-			u.Status.Conditions[i].ObservedGeneration = u.ObjectMeta.Generation
+			u.Status.Conditions[i].ObservedGeneration = u.Generation
 			return
 		}
 	}
@@ -210,7 +210,7 @@ func (u *UpgradePlan) SetCondition(conditionType string, conditionStatus metav1.
 		LastTransitionTime: metav1.Now(),
 		Reason:             reason,
 		Message:            message,
-		ObservedGeneration: u.ObjectMeta.Generation,
+		ObservedGeneration: u.Generation,
 	})
 }
 

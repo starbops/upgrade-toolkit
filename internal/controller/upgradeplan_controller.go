@@ -94,7 +94,10 @@ func (h *harvesterRelease) loadReleaseMetadata() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status: %s", resp.Status)
@@ -149,7 +152,7 @@ func (r *UpgradePlanReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Handle deletion
 	if !upgradePlan.DeletionTimestamp.IsZero() {
-		return r.handleResourceCleanup(ctx, upgradePlanCopy)
+		return r.handleResourceCleanup(upgradePlanCopy)
 	}
 
 	// Phase-based reconciliation
@@ -187,13 +190,13 @@ func (r *UpgradePlanReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *UpgradePlanReconciler) reconcilePhase(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	switch upgradePlan.Status.Phase {
 	case "":
-		return r.initialize(ctx, upgradePlan)
+		return r.initialize(upgradePlan)
 	case managementv1beta1.UpgradePlanPhaseInit, managementv1beta1.UpgradePlanPhaseISODownloading:
-		return r.handleISODownload(ctx, upgradePlan)
+		return r.handleISODownload(upgradePlan)
 	case managementv1beta1.UpgradePlanPhaseISODownloaded, managementv1beta1.UpgradePlanPhaseRepoCreating:
-		return r.handleRepoCreate(ctx, upgradePlan)
+		return r.handleRepoCreate(upgradePlan)
 	case managementv1beta1.UpgradePlanPhaseRepoCreated, managementv1beta1.UpgradePlanPhaseMetadataPopulating:
-		return r.handleMetadataPopulate(ctx, upgradePlan)
+		return r.handleMetadataPopulate(upgradePlan)
 	case managementv1beta1.UpgradePlanPhaseMetadataPopulated, managementv1beta1.UpgradePlanPhaseImagePreloading:
 		return r.handleImagePreload(ctx, upgradePlan)
 	case managementv1beta1.UpgradePlanPhaseImagePreloaded, managementv1beta1.UpgradePlanPhaseClusterUpgrading:
@@ -201,13 +204,13 @@ func (r *UpgradePlanReconciler) reconcilePhase(ctx context.Context, upgradePlan 
 	case managementv1beta1.UpgradePlanPhaseClusterUpgraded, managementv1beta1.UpgradePlanPhaseNodeUpgrading:
 		return r.handleNodeUpgrade(ctx, upgradePlan)
 	case managementv1beta1.UpgradePlanPhaseNodeUpgraded, managementv1beta1.UpgradePlanPhaseCleaningUp:
-		return r.handleResourceCleanup(ctx, upgradePlan)
+		return r.handleResourceCleanup(upgradePlan)
 	default:
-		return r.finalize(ctx, upgradePlan)
+		return r.finalize(upgradePlan)
 	}
 }
 
-func (r *UpgradePlanReconciler) initialize(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
+func (r *UpgradePlanReconciler) initialize(upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(1).Info("handle initialize status")
 
 	upgradePlan.Status.PreviousVersion = ptr.To(settings.ServerVersion.Get())
@@ -217,7 +220,7 @@ func (r *UpgradePlanReconciler) initialize(ctx context.Context, upgradePlan *man
 	return ctrl.Result{}, nil
 }
 
-func (r *UpgradePlanReconciler) handleISODownload(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
+func (r *UpgradePlanReconciler) handleISODownload(upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(1).Info("handle iso download")
 
 	// Dummy iso download
@@ -229,7 +232,7 @@ func (r *UpgradePlanReconciler) handleISODownload(ctx context.Context, upgradePl
 	return ctrl.Result{}, nil
 }
 
-func (r *UpgradePlanReconciler) handleRepoCreate(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
+func (r *UpgradePlanReconciler) handleRepoCreate(upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(1).Info("handle repo create")
 
 	// Dummy repo create
@@ -242,7 +245,7 @@ func (r *UpgradePlanReconciler) handleRepoCreate(ctx context.Context, upgradePla
 }
 
 // handleMetadataPopulate populates UpgradePlan with release metadata retrieved from the Upgrade Repo
-func (r *UpgradePlanReconciler) handleMetadataPopulate(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
+func (r *UpgradePlanReconciler) handleMetadataPopulate(upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(1).Info("handle metadata populate")
 
 	harvesterRelease := newHarvesterRelease(upgradePlan)
@@ -331,7 +334,7 @@ func (r *UpgradePlanReconciler) handleNodeUpgrade(ctx context.Context, upgradePl
 	return ctrl.Result{}, nil
 }
 
-func (r *UpgradePlanReconciler) handleResourceCleanup(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
+func (r *UpgradePlanReconciler) handleResourceCleanup(upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(1).Info("handle resource cleanup")
 
 	// Dummy resource cleanup
@@ -343,7 +346,7 @@ func (r *UpgradePlanReconciler) handleResourceCleanup(ctx context.Context, upgra
 	return ctrl.Result{}, nil
 }
 
-func (r *UpgradePlanReconciler) finalize(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
+func (r *UpgradePlanReconciler) finalize(upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(1).Info("handle finalize")
 
 	markUpgradePlanComplete(upgradePlan)
