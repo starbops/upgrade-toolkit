@@ -145,6 +145,10 @@ type UpgradePlanStatus struct {
 	// +optional
 	PhaseTransitionTimestamps []UpgradePlanPhaseTransitionTimestamp `json:"phaseTransitionTimestamps,omitempty"`
 
+	// previousVersion is the Harvester version before upgrade
+	// +optional
+	PreviousVersion *string `json:"previousVersion,omitempty"`
+
 	// releaseMetadata reflects the essential metadata extracted from the artifact.
 	// +optional
 	ReleaseMetadata *ReleaseMetadata `json:"releaseMetadata,omitempty"`

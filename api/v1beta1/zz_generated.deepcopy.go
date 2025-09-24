@@ -184,6 +184,11 @@ func (in *UpgradePlanStatus) DeepCopyInto(out *UpgradePlanStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.PreviousVersion != nil {
+		in, out := &in.PreviousVersion, &out.PreviousVersion
+		*out = new(string)
+		**out = **in
+	}
 	if in.ReleaseMetadata != nil {
 		in, out := &in.ReleaseMetadata, &out.ReleaseMetadata
 		*out = new(ReleaseMetadata)

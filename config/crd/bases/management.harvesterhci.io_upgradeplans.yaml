@@ -186,6 +186,9 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-list-type: atomic
+              previousVersion:
+                description: previousVersion is the Harvester version before upgrade
+                type: string
               releaseMetadata:
                 description: releaseMetadata reflects the essential metadata extracted
                   from the artifact.

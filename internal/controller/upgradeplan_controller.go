@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/harvester/harvester/pkg/settings"
 	managementv1beta1 "github.com/harvester/upgrade-toolkit/api/v1beta1"
 )
 
@@ -124,6 +125,7 @@ type UpgradePlanReconciler struct {
 // +kubebuilder:rbac:groups=management.harvesterhci.io,resources=upgradeplans/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,namespace=harvester-system,resources=jobs,verbs=get;list;watch;create;update
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=harvesterhci.io,resources=settings,verbs=get;list;watch
 // +kubebuilder:rbac:groups=upgrade.cattle.io,namespace=cattle-system,resources=plans,verbs=get;list;watch;create;update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -208,6 +210,7 @@ func (r *UpgradePlanReconciler) reconcilePhase(ctx context.Context, upgradePlan 
 func (r *UpgradePlanReconciler) initialize(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(1).Info("handle initialize status")
 
+	upgradePlan.Status.PreviousVersion = ptr.To(settings.ServerVersion.Get())
 	upgradePlan.SetCondition(managementv1beta1.UpgradePlanAvailable, metav1.ConditionTrue, "Initialized", "")
 	upgradePlan.SetCondition(managementv1beta1.UpgradePlanProgressing, metav1.ConditionTrue, string(managementv1beta1.UpgradePlanPhaseInit), "")
 	upgradePlan.Status.Phase = managementv1beta1.UpgradePlanPhaseInit
