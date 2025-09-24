@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -122,6 +123,7 @@ type UpgradePlanReconciler struct {
 // +kubebuilder:rbac:groups=management.harvesterhci.io,resources=upgradeplans/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=management.harvesterhci.io,resources=upgradeplans/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,namespace=harvester-system,resources=jobs,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=upgrade.cattle.io,namespace=cattle-system,resources=plans,verbs=get;list;watch;create;update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -347,6 +349,18 @@ func (r *UpgradePlanReconciler) finalize(ctx context.Context, upgradePlan *manag
 	return ctrl.Result{}, nil
 }
 
+func (r *UpgradePlanReconciler) isSingleNodeCluster(ctx context.Context) (bool, error) {
+	var nodeList corev1.NodeList
+	if err := r.List(ctx, &nodeList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set{
+			harvesterManagedLabel: "true",
+		}),
+	}); err != nil {
+		return false, err
+	}
+	return len(nodeList.Items) == 1, nil
+}
+
 func (r *UpgradePlanReconciler) getOrCreatePlanForImagePreload(
 	ctx context.Context,
 	up *managementv1beta1.UpgradePlan,
@@ -387,10 +401,14 @@ func (r *UpgradePlanReconciler) getOrCreatePlanForNodeUpgrade(
 		Namespace: cattleSystemNamespace,
 		Name:      fmt.Sprintf("%s-%s", up.Name, nodeComponent),
 	}
+	single, err := r.isSingleNodeCluster(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return getOrCreate(
 		ctx, r.Client, r.Scheme, nn,
 		func() *upgradev1.Plan { return &upgradev1.Plan{} },
-		func() *upgradev1.Plan { return constructPlanForNodeUpgrade(up) },
+		func() *upgradev1.Plan { return constructPlanForNodeUpgrade(up, !single) },
 		up,
 	)
 }
@@ -628,7 +646,7 @@ func constructPlanForImagePreload(upgradePlan *managementv1beta1.UpgradePlan) *u
 	return constructPlan(upgradePlan.Name, prepareComponent, 1, selector, false, container, version)
 }
 
-func constructPlanForNodeUpgrade(upgradePlan *managementv1beta1.UpgradePlan) *upgradev1.Plan {
+func constructPlanForNodeUpgrade(upgradePlan *managementv1beta1.UpgradePlan, maintenance bool) *upgradev1.Plan {
 	selector := &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
@@ -645,7 +663,7 @@ func constructPlanForNodeUpgrade(upgradePlan *managementv1beta1.UpgradePlan) *up
 	}
 	version := getKubernetesVersion(upgradePlan)
 
-	return constructPlan(upgradePlan.Name, nodeComponent, 1, selector, true, container, version)
+	return constructPlan(upgradePlan.Name, nodeComponent, 1, selector, maintenance, container, version)
 }
 
 func isJobFinished(job *batchv1.Job) (finished, success bool) {
