@@ -183,7 +183,7 @@ func (r *UpgradePlanReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *UpgradePlanReconciler) reconcilePhase(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	switch upgradePlan.Status.Phase {
 	case "":
-		return r.initializeStatus(ctx, upgradePlan)
+		return r.initialize(ctx, upgradePlan)
 	case managementv1beta1.UpgradePlanPhaseInit, managementv1beta1.UpgradePlanPhaseISODownloading:
 		return r.handleISODownload(ctx, upgradePlan)
 	case managementv1beta1.UpgradePlanPhaseISODownloaded, managementv1beta1.UpgradePlanPhaseRepoCreating:
@@ -199,11 +199,11 @@ func (r *UpgradePlanReconciler) reconcilePhase(ctx context.Context, upgradePlan 
 	case managementv1beta1.UpgradePlanPhaseNodeUpgraded, managementv1beta1.UpgradePlanPhaseCleaningUp:
 		return r.handleResourceCleanup(ctx, upgradePlan)
 	default:
-		return r.handleFinalize(ctx, upgradePlan)
+		return r.finalize(ctx, upgradePlan)
 	}
 }
 
-func (r *UpgradePlanReconciler) initializeStatus(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
+func (r *UpgradePlanReconciler) initialize(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(0).Info("handle initialize status")
 
 	upgradePlan.SetCondition(managementv1beta1.UpgradePlanAvailable, metav1.ConditionTrue, "Initialized", "")
@@ -338,7 +338,7 @@ func (r *UpgradePlanReconciler) handleResourceCleanup(ctx context.Context, upgra
 	return ctrl.Result{}, nil
 }
 
-func (r *UpgradePlanReconciler) handleFinalize(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
+func (r *UpgradePlanReconciler) finalize(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (ctrl.Result, error) {
 	r.Log.V(0).Info("handle finalize")
 
 	markUpgradePlanComplete(upgradePlan)
@@ -347,91 +347,95 @@ func (r *UpgradePlanReconciler) handleFinalize(ctx context.Context, upgradePlan 
 	return ctrl.Result{}, nil
 }
 
-func (r *UpgradePlanReconciler) createPlanForImagePreload(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*upgradev1.Plan, error) {
-	newPlan := constructPlanForImagePreload(upgradePlan)
-	if err := controllerutil.SetControllerReference(upgradePlan, newPlan, r.Scheme); err != nil {
-		return nil, err
+func (r *UpgradePlanReconciler) getOrCreatePlanForImagePreload(
+	ctx context.Context,
+	up *managementv1beta1.UpgradePlan,
+) (*upgradev1.Plan, error) {
+	nn := types.NamespacedName{
+		Namespace: cattleSystemNamespace,
+		Name:      fmt.Sprintf("%s-%s", up.Name, prepareComponent),
 	}
-	if err := r.Create(ctx, newPlan, &client.CreateOptions{}); err != nil {
-		return nil, err
-	}
-
-	var plan upgradev1.Plan
-	if err := r.Get(ctx, types.NamespacedName{Namespace: newPlan.Namespace, Name: newPlan.Name}, &plan); err != nil {
-		return nil, err
-	}
-
-	return &plan, nil
+	return getOrCreate(
+		ctx, r.Client, r.Scheme, nn,
+		func() *upgradev1.Plan { return &upgradev1.Plan{} },
+		func() *upgradev1.Plan { return constructPlanForImagePreload(up) },
+		up,
+	)
 }
 
-func (r *UpgradePlanReconciler) createJobForClusterUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*batchv1.Job, error) {
-	newJob := constructJobForClusterUpgrade(upgradePlan)
-	if err := controllerutil.SetControllerReference(upgradePlan, newJob, r.Scheme); err != nil {
-		return nil, err
+func (r *UpgradePlanReconciler) getOrCreateJobForClusterUpgrade(
+	ctx context.Context,
+	up *managementv1beta1.UpgradePlan,
+) (*batchv1.Job, error) {
+	nn := types.NamespacedName{
+		Namespace: harvesterSystemNamespace,
+		Name:      fmt.Sprintf("%s-%s", up.Name, clusterComponent),
 	}
-	if err := r.Create(ctx, newJob, &client.CreateOptions{}); err != nil {
-		return nil, err
-	}
-
-	var job batchv1.Job
-	if err := r.Get(ctx, types.NamespacedName{Namespace: newJob.Namespace, Name: newJob.Name}, &job); err != nil {
-		return nil, err
-	}
-
-	return &job, nil
+	return getOrCreate(
+		ctx, r.Client, r.Scheme, nn,
+		func() *batchv1.Job { return &batchv1.Job{} },
+		func() *batchv1.Job { return constructJobForClusterUpgrade(up) },
+		up,
+	)
 }
 
-func (r *UpgradePlanReconciler) createPlanForNodeUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*upgradev1.Plan, error) {
-	newPlan := constructPlanForNodeUpgrade(upgradePlan)
-	if err := controllerutil.SetControllerReference(upgradePlan, newPlan, r.Scheme); err != nil {
-		return nil, err
+func (r *UpgradePlanReconciler) getOrCreatePlanForNodeUpgrade(
+	ctx context.Context,
+	up *managementv1beta1.UpgradePlan,
+) (*upgradev1.Plan, error) {
+	nn := types.NamespacedName{
+		Namespace: cattleSystemNamespace,
+		Name:      fmt.Sprintf("%s-%s", up.Name, nodeComponent),
 	}
-	if err := r.Create(ctx, newPlan, &client.CreateOptions{}); err != nil {
-		return nil, err
-	}
-
-	var plan upgradev1.Plan
-	if err := r.Get(ctx, types.NamespacedName{Namespace: newPlan.Namespace, Name: newPlan.Name}, &plan); err != nil {
-		return nil, err
-	}
-
-	return &plan, nil
+	return getOrCreate(
+		ctx, r.Client, r.Scheme, nn,
+		func() *upgradev1.Plan { return &upgradev1.Plan{} },
+		func() *upgradev1.Plan { return constructPlanForNodeUpgrade(up) },
+		up,
+	)
 }
 
-func (r *UpgradePlanReconciler) getOrCreatePlanForImagePreload(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*upgradev1.Plan, error) {
-	planName := fmt.Sprintf("%s-%s", upgradePlan.Name, prepareComponent)
-	var plan upgradev1.Plan
-	if err := r.Get(ctx, types.NamespacedName{Namespace: cattleSystemNamespace, Name: planName}, &plan); err != nil {
+func createOwnedAndFetch[T client.Object](
+	ctx context.Context,
+	c client.Client,
+	scheme *runtime.Scheme,
+	owner client.Object,
+	obj T,
+) (T, error) {
+	if err := controllerutil.SetControllerReference(owner, obj, scheme); err != nil {
+		var zero T
+		return zero, err
+	}
+	if err := c.Create(ctx, obj, &client.CreateOptions{}); err != nil {
+		var zero T
+		return zero, err
+	}
+	nn := types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}
+	if err := c.Get(ctx, nn, obj); err != nil {
+		var zero T
+		return zero, err
+	}
+	return obj, nil
+}
+
+func getOrCreate[T client.Object](
+	ctx context.Context,
+	c client.Client,
+	scheme *runtime.Scheme,
+	nn types.NamespacedName,
+	newObj func() T,
+	build func() T,
+	owner client.Object,
+) (T, error) {
+	obj := newObj()
+	if err := c.Get(ctx, nn, obj); err != nil {
 		if apierrors.IsNotFound(err) {
-			return r.createPlanForImagePreload(ctx, upgradePlan)
+			return createOwnedAndFetch(ctx, c, scheme, owner, build())
 		}
-		return nil, err
+		var zero T
+		return zero, err
 	}
-	return &plan, nil
-}
-
-func (r *UpgradePlanReconciler) getOrCreateJobForClusterUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*batchv1.Job, error) {
-	jobName := fmt.Sprintf("%s-%s", upgradePlan.Name, clusterComponent)
-	var job batchv1.Job
-	if err := r.Get(ctx, types.NamespacedName{Namespace: harvesterSystemNamespace, Name: jobName}, &job); err != nil {
-		if apierrors.IsNotFound(err) {
-			return r.createJobForClusterUpgrade(ctx, upgradePlan)
-		}
-		return nil, err
-	}
-	return &job, nil
-}
-
-func (r *UpgradePlanReconciler) getOrCreatePlanForNodeUpgrade(ctx context.Context, upgradePlan *managementv1beta1.UpgradePlan) (*upgradev1.Plan, error) {
-	planName := fmt.Sprintf("%s-%s", upgradePlan.Name, nodeComponent)
-	var plan upgradev1.Plan
-	if err := r.Get(ctx, types.NamespacedName{Namespace: cattleSystemNamespace, Name: planName}, &plan); err != nil {
-		if apierrors.IsNotFound(err) {
-			return r.createPlanForNodeUpgrade(ctx, upgradePlan)
-		}
-		return nil, err
-	}
-	return &plan, nil
+	return obj, nil
 }
 
 func isTerminalPhase(phase managementv1beta1.UpgradePlanPhase) bool {
