@@ -13,6 +13,22 @@ rules:
   - list
   - watch
 - apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs/status
+  verbs:
+  - get
+- apiGroups:
   - harvesterhci.io
   resources:
   - settings
@@ -49,48 +65,10 @@ rules:
   - get
   - patch
   - update
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: manager-role
-  namespace: cattle-system
-rules:
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - batch
-  resources:
-  - jobs/status
-  verbs:
-  - get
 - apiGroups:
   - upgrade.cattle.io
   resources:
   - plans
-  verbs:
-  - create
-  - get
-  - list
-  - update
-  - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: manager-role
-  namespace: harvester-system
-rules:
-- apiGroups:
-  - batch
-  resources:
-  - jobs
   verbs:
   - create
   - get

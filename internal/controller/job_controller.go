@@ -44,8 +44,8 @@ type JobReconciler struct {
 
 type reconcileFuncs func(context.Context, *batchv1.Job) error
 
-// +kubebuilder:rbac:groups=batch,namespace=cattle-system,resources=jobs,verbs=get;list;watch
-// +kubebuilder:rbac:groups=batch,namespace=cattle-system,resources=jobs/status,verbs=get
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
 // +kubebuilder:rbac:groups=management.harvesterhci.io,resources=upgradeplans/status,verbs=get;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
